@@ -3,10 +3,245 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Test</title>
+    <title>Ask AI</title>
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        font-family: Arial, sans-serif;
+        background:
+          radial-gradient(circle at top left, rgba(99, 102, 241, 0.18), transparent 30%),
+          radial-gradient(circle at top right, rgba(16, 185, 129, 0.14), transparent 25%),
+          #081225;
+        color: white;
+        min-height: 100vh;
+      }
+
+      .wrap {
+        width: min(960px, calc(100% - 32px));
+        margin: 48px auto;
+      }
+
+      .card {
+        background: rgba(15, 23, 42, 0.88);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 28px;
+        padding: 28px;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+      }
+
+      .badge {
+        display: inline-block;
+        padding: 8px 14px;
+        border-radius: 999px;
+        background: rgba(99, 102, 241, 0.15);
+        color: #c7d2fe;
+        font-size: 13px;
+        margin-bottom: 16px;
+      }
+
+      h1 {
+        margin: 0 0 12px;
+        font-size: 48px;
+      }
+
+      .subtitle {
+        color: #cbd5e1;
+        line-height: 1.7;
+        margin-bottom: 28px;
+      }
+
+      .ask-row {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 14px;
+      }
+
+      input {
+        width: 100%;
+        height: 58px;
+        border-radius: 18px;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        background: rgba(15, 23, 42, 0.9);
+        color: white;
+        padding: 0 18px;
+        font-size: 16px;
+        outline: none;
+      }
+
+      input::placeholder {
+        color: #94a3b8;
+      }
+
+      button {
+        height: 58px;
+        padding: 0 22px;
+        border: none;
+        border-radius: 18px;
+        font-size: 15px;
+        font-weight: bold;
+        color: white;
+        cursor: pointer;
+        background: linear-gradient(135deg, #6366f1, #8b5cf6);
+      }
+
+      button:disabled {
+        opacity: 0.7;
+        cursor: not-allowed;
+      }
+
+      .panel {
+        margin-top: 20px;
+        padding: 22px;
+        border-radius: 22px;
+        background: rgba(15, 23, 42, 0.82);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+      }
+
+      .label {
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.16em;
+        color: #94a3b8;
+        margin-bottom: 12px;
+      }
+
+      .answer {
+        white-space: pre-wrap;
+        line-height: 1.8;
+        color: #eef2ff;
+      }
+
+      .source {
+        margin-top: 10px;
+        padding: 14px;
+        border-radius: 16px;
+        background: rgba(255, 255, 255, 0.04);
+        color: #cbd5e1;
+        line-height: 1.7;
+      }
+
+      .hidden {
+        display: none;
+      }
+
+      @media (max-width: 720px) {
+        .wrap {
+          margin: 20px auto;
+        }
+
+        .card {
+          padding: 20px;
+        }
+
+        h1 {
+          font-size: 34px;
+        }
+
+        .ask-row {
+          grid-template-columns: 1fr;
+        }
+
+        button {
+          width: 100%;
+        }
+      }
+    </style>
   </head>
-  <body style="font-family: Arial; padding: 40px;">
-    <h1>Site-ul merge</h1>
-    <p>Dacă vezi asta, problema era în codul vechi din index.html.</p>
+  <body>
+    <div class="wrap">
+      <div class="card">
+        <div class="badge">AI Answers din document</div>
+        <h1>Întreabă orice</h1>
+        <div class="subtitle">
+          Utilizatorul vede doar întrebarea. Documentul stă în backend, iar AI-ul caută în el și răspunde.
+        </div>
+
+        <div class="ask-row">
+          <input id="question" type="text" placeholder="Ex: Care este politica de retur?" />
+          <button id="askBtn">Întreabă AI</button>
+        </div>
+
+        <div id="answerCard" class="panel hidden">
+          <div class="label">Răspuns</div>
+          <div id="answerText" class="answer"></div>
+        </div>
+
+        <div id="sourcesCard" class="panel hidden">
+          <div class="label">Fragmente folosite</div>
+          <div id="sourcesList"></div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      const questionInput = document.getElementById("question");
+      const askBtn = document.getElementById("askBtn");
+      const answerCard = document.getElementById("answerCard");
+      const answerText = document.getElementById("answerText");
+      const sourcesCard = document.getElementById("sourcesCard");
+      const sourcesList = document.getElementById("sourcesList");
+
+      async function askAI() {
+        const question = questionInput.value.trim();
+
+        if (!question) {
+          alert("Scrie o întrebare.");
+          return;
+        }
+
+        askBtn.disabled = true;
+        askBtn.textContent = "Se caută...";
+        answerCard.classList.remove("hidden");
+        answerText.textContent = "Generez răspunsul...";
+        sourcesCard.classList.add("hidden");
+        sourcesList.innerHTML = "";
+
+        try {
+          const response = await fetch("/api/ask", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json"
+            },
+            body: JSON.stringify({ question: question })
+          });
+
+          const data = await response.json();
+
+          if (!response.ok) {
+            throw new Error(data.error || "A apărut o eroare.");
+          }
+
+          answerText.textContent = data.answer || "Nu există răspuns.";
+
+          if (Array.isArray(data.sources) && data.sources.length > 0) {
+            sourcesCard.classList.remove("hidden");
+
+            data.sources.forEach(function(source) {
+              const div = document.createElement("div");
+              div.className = "source";
+              div.textContent = source;
+              sourcesList.appendChild(div);
+            });
+          }
+        } catch (error) {
+          answerText.textContent = error.message || "A apărut o eroare.";
+        } finally {
+          askBtn.disabled = false;
+          askBtn.textContent = "Întreabă AI";
+        }
+      }
+
+      askBtn.addEventListener("click", askAI);
+
+      questionInput.addEventListener("keydown", function(event) {
+        if (event.key === "Enter") {
+          askAI();
+        }
+      });
+    </script>
   </body>
 </html>
